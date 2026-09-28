@@ -10,8 +10,14 @@
 .hero{text-align:center;margin:38px 0 28px}.kicker{color:var(--muted);font-size:12px;letter-spacing:.16em}.hero h1{font-size:clamp(28px,5vw,42px);line-height:1.2;letter-spacing:-.04em;margin:8px 0}.hero p{color:var(--muted);margin:0;font-size:14px}
 .panel{background:rgba(21,21,25,.94);border:1px solid var(--line);border-radius:24px;padding:clamp(18px,4vw,28px);margin:15px 0;box-shadow:0 18px 60px #0003}
 label,.section-title{font-weight:700;font-size:14px;display:flex;justify-content:space-between;gap:12px;align-items:center;margin-bottom:10px}.hint{color:var(--muted);font-size:12px;font-weight:400}
-input,select{width:100%;background:#0b0b0e;border:1px solid #383840;color:var(--text);padding:14px;border-radius:13px;font:inherit;outline:none;min-width:0}input:focus,select:focus{border-color:#818cf8;box-shadow:0 0 0 3px #818cf822}
-.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:18px}.option{display:flex;align-items:center;gap:11px;padding:14px;background:#0c0c0f;border:1px solid var(--line);border-radius:14px;cursor:pointer;margin:0}.option input{width:18px;height:18px;accent-color:var(--green);padding:0}.option span{display:block}.option small{display:block;color:var(--muted);font-weight:400}
+
+/* 입력창 컨테이너 (단위 오버레이용) */
+.input-wrap{position:relative;display:flex;align-items:center}
+input,select{width:100%;background:#0b0b0e;border:1px solid #383840;color:var(--text);padding:14px;padding-right:110px;border-radius:13px;font:inherit;outline:none;min-width:0}
+input:focus,select:focus{border-color:#818cf8;box-shadow:0 0 0 3px #818cf822}
+.input-unit{position:absolute;right:14px;color:var(--muted);font-size:13px;pointer-events:none;white-space:nowrap}
+
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:18px}.option{display:flex;align-items:center;gap:11px;padding:14px;background:#0c0c0f;border:1px solid var(--line);border-radius:14px;cursor:pointer;margin:0}.option input{width:18px;height:18px;accent-color:var(--green);padding:0;width:auto}.option span{display:block}.option small{display:block;color:var(--muted);font-weight:400}
 .divider{height:1px;background:var(--line);margin:24px 0}
 .add{border:1px solid #3a5c50;background:#14352b;color:#b9f7dc;border-radius:13px;padding:12px 16px;font-weight:700;cursor:pointer;white-space:nowrap}.add:hover{background:#1b493a}
 .coupon-item{background:#0d0d11;border:1px solid var(--line);border-radius:16px;padding:15px;margin-top:12px}.coupon-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;font-weight:700}.remove{background:transparent;border:0;color:#fca5a5;cursor:pointer;font-size:13px}
@@ -22,11 +28,14 @@ input,select{width:100%;background:#0b0b0e;border:1px solid #383840;color:var(--
 </style></head>
 <body><main class="wrap">
 <div class="brand"><div class="logo">ƒ</div><span>FC MARKET</span></div>
-<header class="hero"><div class="kicker">FC ONLINE · TRANSFER MARKET</div><h1>이적시장 수수료 계산기</h1><p>전체 판매 금액과 쿠폰을 사용할 선수를 입력하세요.</p></header>
+<header class="hero"><div class="kicker">FC ONLINE · TRANSFER MARKET</div><h1>이적시장 수수료 계산기</h1><p>전체 판매 금액과 쿠폰을 사용할 선수만 입력하세요.</p></header>
 
 <section class="panel">
 <label for="total">전체 선수 판매 금액 합계 <span class="hint">단위: BP</span></label>
-<input id="total" type="text" inputmode="numeric" placeholder="전체 판매 금액 입력" value="">
+<div class="input-wrap">
+  <input id="total" type="text" inputmode="numeric" placeholder="전체 판매 금액 입력" value="">
+  <span id="total-unit" class="input-unit"></span>
+</div>
 <div class="grid">
 <label class="option"><input id="top" type="checkbox"><span>TOP CLASS<small>수수료 20% 할인</small></span></label>
 <label class="option"><input id="pc" type="checkbox"><span>PC방 혜택<small>수수료 30% 할인</small></span></label>
@@ -35,7 +44,7 @@ input,select{width:100%;background:#0b0b0e;border:1px solid #383840;color:var(--
 <div class="divider"></div>
 
 <div class="section-title"><span>쿠폰 적용 선수</span><button class="add" id="add" type="button">＋ 선수 추가</button></div>
-<p class="hint">쿠폰을 사용하는 선수를 추가하세요. </p>
+<p class="hint">쿠폰을 사용하는 선수만 추가하세요. 선수의 이름, 판매가와 쿠폰 할인율을 따로 입력합니다.</p>
 <div id="coupons"></div>
 <div class="warning" id="warning">쿠폰 적용 선수 금액 합계가 전체 판매 금액을 초과했습니다. 금액을 확인해 주세요.</div>
 
@@ -56,7 +65,29 @@ input,select{width:100%;background:#0b0b0e;border:1px solid #383840;color:var(--
 <script>
 const $=id=>document.getElementById(id),fmt=n=>Math.floor(n).toLocaleString('ko-KR')+' BP';
 const parseNum=v=>Number(String(v).replace(/,/g,''))||0;
-const formatInput=input=>{let v=parseNum(input.value);input.value=v>0?v.toLocaleString('ko-KR'):'';};
+
+// 금액을 한글 단위(억, 만) 문자열로 바꿔주는 함수 (입력창 우측 표시용)
+function getKoreanUnitStr(n) {
+  if (n <= 0) return '';
+  let val = Math.floor(n);
+  let billions = Math.floor(val / 100000000);
+  let tenThousand = Math.floor((val % 100000000) / 10000);
+  let remainder = val % 10000;
+
+  let res = '';
+  if (billions > 0) res += billions.toLocaleString('ko-KR') + '억 ';
+  if (tenThousand > 0) res += tenThousand.toLocaleString('ko-KR') + '만 ';
+  if (billions === 0 && tenThousand === 0 && remainder > 0) res += remainder.toLocaleString('ko-KR') + ' ';
+  return res.trim();
+}
+
+const formatInput=(input, unitSpan)=>{
+  let v=parseNum(input.value);
+  input.value = v > 0 ? v.toLocaleString('ko-KR') : '';
+  if(unitSpan) {
+    unitSpan.textContent = v > 0 ? getKoreanUnitStr(v) : '';
+  }
+};
 
 // 전체 예상 실수령액 전용 억, 만 단위 표시 함수
 function fmtKorean(n) {
@@ -74,25 +105,43 @@ function fmtKorean(n) {
   return res.trim() + ' BP';
 }
 
-let nextId=1;
 function addCoupon(name='',price='',rate=''){
- const id=nextId++;
- const el=document.createElement('div');el.className='coupon-item';el.dataset.id=id;
- el.innerHTML=`<div class="coupon-head"><span>쿠폰 선수 ${id}</span><button class="remove" type="button">삭제</button></div><div class="coupon-fields"><div><label class="sub-label" for="n${id}">선수 이름</label><input id="n${id}" class="cp-name" type="text" placeholder="예: 호날두" value="${name}"></div><div><label class="sub-label" for="p${id}">선수 판매 금액 (BP)</label><input id="p${id}" class="cp-price" type="text" inputmode="numeric" placeholder="판매가 입력" value="${price?Number(price).toLocaleString('ko-KR'):''}"></div><div><label class="sub-label" for="r${id}">쿠폰 할인율 (%)</label><input id="r${id}" class="cp-rate" type="number" min="0" max="100" step="1" placeholder="예: 30" value="${rate}"></div></div>`;
+ const el=document.createElement('div');el.className='coupon-item';
+ el.innerHTML=`<div class="coupon-head"><span class="coupon-title">쿠폰 선수</span><button class="remove" type="button">삭제</button></div><div class="coupon-fields"><div><label class="sub-label">선수 이름</label><input class="cp-name" type="text" placeholder="예: 호날두" value="${name}"></div><div><label class="sub-label">선수 판매 금액 (BP)</label><div class="input-wrap"><input class="cp-price" type="text" inputmode="numeric" placeholder="판매가 입력" value="${price?Number(price).toLocaleString('ko-KR'):''}"><span class="input-unit cp-unit"></span></div></div><div><label class="sub-label">쿠폰 할인율 (%)</label><input class="cp-rate" type="number" min="0" max="100" step="1" placeholder="예: 30" value="${rate}"></div></div>`;
  
  el.querySelector('.remove').addEventListener('click',()=>{
    el.remove();
+   updateCouponIndices();
    calculate();
  });
  
- el.querySelector('.cp-price').addEventListener('input',function(){
-   formatInput(this);
+ const priceInput = el.querySelector('.cp-price');
+ const unitSpan = el.querySelector('.cp-unit');
+ 
+ if(priceInput.value) {
+   unitSpan.textContent = getKoreanUnitStr(parseNum(priceInput.value));
+ }
+
+ priceInput.addEventListener('input',function(){
+   formatInput(this, unitSpan);
    calculate();
  });
  
- el.querySelectorAll('input').forEach(i=>i.addEventListener('input',calculate));
+ el.querySelectorAll('input').forEach(i => {
+   if(i !== priceInput) i.addEventListener('input', calculate);
+ });
+
  $('coupons').appendChild(el);
+ updateCouponIndices();
  calculate();
+}
+
+// 쿠폰 선수 번호를 순서대로 재정렬하는 함수
+function updateCouponIndices() {
+  const items = document.querySelectorAll('.coupon-item');
+  items.forEach((el, index) => {
+    el.querySelector('.coupon-title').textContent = `쿠폰 선수 ${index + 1}`;
+  });
 }
 
 function calculate(){
@@ -114,7 +163,6 @@ function calculate(){
  const regularFee=Math.floor(remaining*baseRate*(1-common/100));
  const fee=regularFee+couponFee;
  
- // 수수료 혜택으로 절약한 금액 계산 (기본 40% 수수료 - 최종 수수료)
  const maxBaseFee = Math.floor(total * baseRate);
  const savedFee = Math.max(0, maxBaseFee - fee);
  
@@ -124,12 +172,21 @@ function calculate(){
  $('warning').style.display=couponSum>total?'block':'none';
 }
 
-$('add').addEventListener('click',()=>addCoupon());$('total').addEventListener('input',function(){formatInput(this);calculate();});
-['top','pc'].forEach(id=>$(id).addEventListener('change',calculate));$('reset').addEventListener('click',()=>{
- $('total').value='';$('top').checked=false;
+$('add').addEventListener('click',()=>addCoupon());
+
+const totalInput = $('total');
+const totalUnit = $('total-unit');
+totalInput.addEventListener('input',function(){
+  formatInput(this, totalUnit);
+  calculate();
+});
+
+['top','pc'].forEach(id=>$(id).addEventListener('change',calculate));
+$('reset').addEventListener('click',()=>{$('total').value='';
+ totalUnit.textContent='';
+ $('top').checked=false;
  $('pc').checked=false;
  $('coupons').innerHTML='';
- nextId=1;
  calculate();
 });
 calculate();
